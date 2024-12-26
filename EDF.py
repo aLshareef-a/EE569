@@ -19,7 +19,6 @@ class Node:
     def backward(self):
         raise NotImplementedError
 
-
 # Input Node
 class Input(Node):
     def __init__(self):
@@ -34,7 +33,6 @@ class Input(Node):
         for n in self.outputs:
             self.gradients[self] += n.gradients[self]
 
-
 # Parameter Node
 class Parameter(Node):
     def __init__(self, value):
@@ -47,40 +45,47 @@ class Parameter(Node):
     def backward(self):
         self.gradients = {self: 0}
         for n in self.outputs:
-            self.gradients[self] += n.gradients[self]
+            self.gradients[self] += n.gradients[self] 
+
+class Linear(Node):
+    def __init__(self, x, A, b):
+        Node.__init__(self, [x, A, b])
+
+    def forward(self):
+        x, A, b = self.inputs
+        self.value = np.dot(x.value , A.value) + b.value
+
+    def backward(self):
+        x, A, b = self.inputs
+        self.gradients[x] = np.dot(self.outputs[0].gradients[self] , A.value.T)
+        self.gradients[A] = self.outputs[0].gradients[self] * x.value
+        self.gradients[b] = self.outputs[0].gradients[self]
 
 class Multiply(Node):
     def __init__(self, x, y):
-        # Initialize with two inputs x and y
         Node.__init__(self, [x, y])
 
     def forward(self):
-        # Perform element-wise multiplication
         x, y = self.inputs
         self.value = x.value * y.value
 
     def backward(self):
-        # Compute gradients for x and y based on the chain rule
         x, y = self.inputs
         self.gradients[x] = self.outputs[0].gradients[self] * y.value
         self.gradients[y] = self.outputs[0].gradients[self] * x.value
 
 class Addition(Node):
     def __init__(self, x, y):
-        # Initialize with two inputs x and y
         Node.__init__(self, [x, y])
 
     def forward(self):
-        # Perform element-wise addition
         x, y = self.inputs
         self.value = x.value + y.value
 
     def backward(self):
-        # The gradient of addition with respect to both inputs is the gradient of the output
         x, y = self.inputs
         self.gradients[x] = self.outputs[0].gradients[self]
         self.gradients[y] = self.outputs[0].gradients[self]
-
 
 # Sigmoid Activation Node
 class Sigmoid(Node):
@@ -104,9 +109,11 @@ class BCE(Node):
 
     def forward(self):
         y_true, y_pred = self.inputs
-        self.value = np.sum(-y_true.value*np.log(y_pred.value)-(1-y_true.value)*np.log(1-y_pred.value))
+        self.value = -(1 / y_true.value.shape[0]) * np.sum(y_true.value * np.log(y_pred.value) + (1 - y_true.value) * np.log(1 - y_pred.value))
 
     def backward(self):
         y_true, y_pred = self.inputs
-        self.gradients[y_pred] = (1 / y_true.value.shape[0]) * (y_pred.value - y_true.value)/(y_pred.value*(1-y_pred.value))
-        self.gradients[y_true] = (1 / y_true.value.shape[0]) * (np.log(y_pred.value) - np.log(1-y_pred.value))
+        self.gradients[y_pred] = (y_pred.value - y_true.value) / (y_pred.value * (1 - y_pred.value))
+        self.gradients[y_true] = -(np.log(y_pred.value) - np.log(1 - y_pred.value))
+
+
